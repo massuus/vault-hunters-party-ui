@@ -1,6 +1,7 @@
 package dev.massuus.vaultpartyui.client.screen;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import iskallia.vault.client.data.ClientPartyData;
 import iskallia.vault.client.data.ClientPartyInviteState;
@@ -12,9 +13,12 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
@@ -33,6 +37,7 @@ public class PartyScreen extends Screen {
     private static final int PANEL_PADDING = 10;
     private static final int ONLINE_ROW_HEIGHT = 14;
     private static final int VISIBLE_ONLINE_ROWS = 8;
+    private static final int HEAD_SIZE = 8;
 
     private final Screen parentScreen;
 
@@ -130,11 +135,24 @@ public class PartyScreen extends Screen {
             this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.target").getString(), this.targetBox.x, this.targetBox.y - 10, 0xA0A0A0);
         }
 
-        // Credit
+        // Credit (clickable)
         String credit = "Made by Massuus";
         int creditX = this.width - this.font.width(credit) - 8;
         int creditY = this.height - 18;
-        this.font.draw(poseStack, credit, creditX, creditY, 0xAAAAAA);
+        boolean creditHovered = mouseX >= creditX && mouseX <= creditX + this.font.width(credit) && mouseY >= creditY && mouseY <= creditY + this.font.lineHeight;
+        int creditColor = creditHovered ? 0xFFFFFF : 0xAAAAAA;
+        this.font.draw(poseStack, credit, creditX, creditY, creditColor);
+        // underline when hovered
+        if (creditHovered) {
+            int underlineY = creditY + this.font.lineHeight;
+            fill(poseStack, creditX, underlineY, creditX + this.font.width(credit), underlineY + 1, creditColor);
+            // tooltip
+            String tip = new TranslatableComponent("screen.vaultpartyui.credit_tooltip").getString();
+            int tipX = Math.min(this.width - 10 - this.font.width(tip), (int)mouseX + 8);
+            int tipY = creditY - this.font.lineHeight - 6;
+            fill(poseStack, tipX - 4, tipY - 2, tipX + this.font.width(tip) + 4, tipY + this.font.lineHeight + 2, 0xCC111111);
+            this.font.drawShadow(poseStack, tip, tipX, tipY, 0xFFFFFF);
+        }
 
 
     }
@@ -364,7 +382,8 @@ public class PartyScreen extends Screen {
                 color = statusColor(cachedMember.status);
             }
 
-            this.font.draw(poseStack, line.toString(), textX, textY, color);
+            drawPlayerHead(poseStack, memberId, textX, textY + 1);
+            this.font.draw(poseStack, line.toString(), textX + HEAD_SIZE + 4, textY, color);
             textY += 14;
         }
     }
@@ -401,17 +420,23 @@ public class PartyScreen extends Screen {
             
             // draw player name and per-row action (invite/remove)
             this.fill(poseStack, panelX + 10, rowY - 2, panelX + panelWidth - 10, rowY + ONLINE_ROW_HEIGHT - 2, background);
-            this.font.draw(poseStack, player.name, panelX + 12, rowY, 0xFFFFFF);
+            drawPlayerHead(poseStack, player.id, panelX + 12, rowY + 1);
+            this.font.draw(poseStack, player.name, panelX + 12 + HEAD_SIZE + 4, rowY, 0xFFFFFF);
 
             // skip drawing actions for self
             if (!player.id.equals(getLocalPlayerId())) {
                 int actionX = panelX + panelWidth - 84;
-                if (this.currentParty == null) {
-                    // Invite button
-                    this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.invite").getString(), actionX, rowY, 0xA0E0A0);
-                } else if (isPartyLeader()) {
-                    // Remove button
-                    this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.remove").getString(), actionX, rowY, 0xE0A0A0);
+                boolean targetIsInParty = isPlayerInCurrentParty(player.id);
+                if (isLocalPlayerInParty()) {
+                    if (targetIsInParty) {
+                        // Remove button for current members, leader only
+                        if (isPartyLeader()) {
+                            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.remove").getString(), actionX, rowY, 0xE0A0A0);
+                        }
+                    } else {
+                        // Invite button for non-members, visible to any party member
+                        this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.invite").getString(), actionX, rowY, 0xA0E0A0);
+                    }
                 }
             }
 
@@ -446,14 +471,22 @@ public class PartyScreen extends Screen {
         if (player.id.equals(getLocalPlayerId())) {
             return false;
         }
-
         int actionX = panelX + ((this.width - 40 - PANEL_PADDING) / 2) - 84;
         int actionY = listTop + (index - this.onlineScrollOffset) * ONLINE_ROW_HEIGHT + 4;
+        // Use the same action bounds and logic as the renderer. The renderer places the action at
+        // panelX + panelWidth - 84. Recompute panelWidth here for clarity.
+        int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
+        actionX = panelX + panelWidth - 84;
         if (mouseX >= actionX && mouseX <= actionX + 70 && mouseY >= actionY && mouseY <= actionY + ONLINE_ROW_HEIGHT - 2) {
-            if (this.currentParty == null) {
-                sendPartyCommand("party invite " + player.name);
-            } else if (isPartyLeader()) {
-                sendPartyCommand("party remove " + player.name);
+            boolean targetIsInParty = isPlayerInCurrentParty(player.id);
+            if (isLocalPlayerInParty()) {
+                if (targetIsInParty) {
+                    if (isPartyLeader()) {
+                        sendPartyCommand("party remove " + player.name);
+                    }
+                } else {
+                    sendPartyCommand("party invite " + player.name);
+                }
             }
             return true;
         }
@@ -465,6 +498,34 @@ public class PartyScreen extends Screen {
         if (this.currentParty == null) return false;
         UUID leader = this.currentParty.getLeader();
         return leader != null && leader.equals(getLocalPlayerId());
+    }
+
+    private boolean isLocalPlayerInParty() {
+        if (this.currentParty == null) return false;
+        UUID local = getLocalPlayerId();
+        if (local == null) return false;
+        UUID leader = this.currentParty.getLeader();
+        if (leader != null && leader.equals(local)) return true;
+        List<UUID> members = this.currentParty.getMembers();
+        if (members != null) {
+            for (UUID m : members) {
+                if (local.equals(m)) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isPlayerInCurrentParty(UUID playerId) {
+        if (this.currentParty == null || playerId == null) return false;
+        UUID leader = this.currentParty.getLeader();
+        if (leader != null && leader.equals(playerId)) return true;
+        List<UUID> members = this.currentParty.getMembers();
+        if (members != null) {
+            for (UUID memberId : members) {
+                if (playerId.equals(memberId)) return true;
+            }
+        }
+        return false;
     }
 
     private UUID getLocalPlayerId() {
@@ -491,15 +552,38 @@ public class PartyScreen extends Screen {
         return String.format(Locale.ROOT, "%.1f", hp);
     }
 
+    private void drawPlayerHead(PoseStack poseStack, UUID playerId, int x, int y) {
+        ResourceLocation skin = getPlayerSkin(playerId);
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.setShaderTexture(0, skin);
+        // Base face + hat layer from the standard 64x64 skin texture.
+        blit(poseStack, x, y, 8.0F, 8.0F, HEAD_SIZE, HEAD_SIZE, 64, 64);
+        blit(poseStack, x, y, 40.0F, 8.0F, HEAD_SIZE, HEAD_SIZE, 64, 64);
+    }
+
+    private ResourceLocation getPlayerSkin(UUID playerId) {
+        UUID safeId = playerId == null ? new UUID(0L, 0L) : playerId;
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientPacketListener connection = minecraft.getConnection();
+        if (connection != null) {
+            PlayerInfo playerInfo = connection.getPlayerInfo(safeId);
+            if (playerInfo != null) {
+                return playerInfo.getSkinLocation();
+            }
+        }
+        return DefaultPlayerSkin.getDefaultSkin(safeId);
+    }
+
     private int statusColor(PartyMember.Status status) {
         if (status == null) return 0xFFFFFF;
-        switch (status) {
-            case DEAD:
-                return 0xFF5555;
-            case DOWNED:
-                return 0xFFAA00;
-            default:
-                return 0xFFFFFF;
+        String s = status.name();
+        if (s.equalsIgnoreCase("DEAD") || s.contains("DEAD")) {
+            return 0xFF5555;
+        } else if (s.equalsIgnoreCase("DOWNED") || s.toLowerCase(Locale.ROOT).contains("down")) {
+            return 0xFFAA00;
+        } else {
+            return 0xFFFFFF;
         }
     }
 

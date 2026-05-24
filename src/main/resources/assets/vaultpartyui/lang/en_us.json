@@ -23,5 +23,8 @@
   "screen.vaultpartyui.members": "Members",
   "screen.vaultpartyui.online": "Online players",
   "screen.vaultpartyui.leader": "Leader",
+  "screen.vaultpartyui.invite": "Invite",
+  "screen.vaultpartyui.remove": "Remove",
   "screen.vaultpartyui.self": "You"
+  ,"screen.vaultpartyui.credit_tooltip": "Click to open the GitHub repo"
 }
