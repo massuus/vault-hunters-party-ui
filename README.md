@@ -13,6 +13,21 @@ Client-side Forge mod for Vault Hunters (Minecraft 1.18.2) that provides a party
 
 ## Changelog
 
+### 1.2.2
+
+- Removed Runtime.getRuntime() fallback.
+
+### 1.2.1
+
+- Fixed the accept and decline invite buttons so they sit correctly around the Create Party button.
+
+### 1.2.0
+
+- Added favorite players with a clickable star in the online player list.
+- Added Invite Favorites to invite every available favorite player at once.
+- Reworked the party screen layout to better fit the top controls and both list panels.
+- Improved the offline player label shown in the party list.
+
 ### 1.1.0
 
 - Added auto-accept invites toggle that works even when the screen is closed.

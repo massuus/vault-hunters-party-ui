@@ -3,6 +3,7 @@ package dev.massuus.vaultpartyui.client.screen;
 import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
 import dev.massuus.vaultpartyui.client.ClientPartySettings;
 import iskallia.vault.client.data.ClientPartyData;
 import iskallia.vault.client.data.ClientPartyInviteState;
@@ -36,14 +37,15 @@ public class PartyScreen extends Screen {
     private static final int BUTTON_WIDTH = 90;
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 4;
-    private static final int PANEL_TOP = 124;
-    private static final int PANEL_HEIGHT = 155;
+    private static final int PANEL_TOP = 58;
+    private static final int PANEL_HEIGHT = 246;
     private static final int PANEL_PADDING = 10;
     private static final int ONLINE_ROW_HEIGHT = 14;
-    private static final int VISIBLE_ONLINE_ROWS = 8;
+    private static final int VISIBLE_ONLINE_ROWS = 15;
     private static final int HEAD_SIZE = 8;
     private static final long INVITE_COOLDOWN_MS = 8000L;
     private static final int STATE_REFRESH_INTERVAL_TICKS = 4;
+    private static final int STAR_SIZE = 8;
 
     private final Screen parentScreen;
 
@@ -55,6 +57,7 @@ public class PartyScreen extends Screen {
     private Button disbandPartyButton;
     private Button inviteNearbyButton;
     private Button inviteAllButton;
+    private Button inviteFavoritesButton;
     private Button acceptInviteButton;
     private Button declineInviteButton;
     private Button autoAcceptToggleButton;
@@ -74,31 +77,34 @@ public class PartyScreen extends Screen {
         super.init();
         rebuildState();
 
-        int centerX = this.width / 2;
-        int rowWidth = BUTTON_WIDTH * 3 + BUTTON_GAP * 2;
-        int rowX = centerX - rowWidth / 2;
+        int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
+        int leftPanelX = 20;
+        int rightPanelX = leftPanelX + panelWidth + PANEL_PADDING;
+        int leftRowWidth = BUTTON_WIDTH * 2 + BUTTON_GAP;
+        int rightRowWidth = BUTTON_WIDTH * 3 + BUTTON_GAP * 2;
+        int leftRowX = leftPanelX + panelWidth / 2 - leftRowWidth / 2;
+        int rightRowX = rightPanelX + panelWidth / 2 - rightRowWidth / 2;
 
-        this.createPartyButton = addRenderableWidget(new Button(rowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
-        this.leavePartyButton = addRenderableWidget(new Button(rowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave"), button -> sendPartyCommand("party leave")));
-        this.disbandPartyButton = addRenderableWidget(new Button(rowX + (BUTTON_WIDTH + BUTTON_GAP) * 2, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> sendPartyCommand("party disband")));
+        int createX = this.width / 2 - BUTTON_WIDTH / 2;
+        this.createPartyButton = addRenderableWidget(new Button(createX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
+        this.leavePartyButton = addRenderableWidget(new Button(leftRowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave"), button -> sendPartyCommand("party leave")));
+        this.disbandPartyButton = addRenderableWidget(new Button(leftRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> sendPartyCommand("party disband")));
 
-        this.inviteNearbyButton = addRenderableWidget(new Button(centerX - BUTTON_WIDTH - (BUTTON_GAP / 2), 62, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby"), button -> sendPartyCommand("party invite nearby")));
-        this.inviteAllButton = addRenderableWidget(new Button(centerX + (BUTTON_GAP / 2), 62, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all"), button -> sendPartyCommand("party invite all")));
+        this.inviteNearbyButton = addRenderableWidget(new Button(rightRowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby"), button -> sendPartyCommand("party invite nearby")));
+        this.inviteAllButton = addRenderableWidget(new Button(rightRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all"), button -> sendPartyCommand("party invite all")));
+        this.inviteFavoritesButton = addRenderableWidget(new Button(rightRowX + (BUTTON_WIDTH + BUTTON_GAP) * 2, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_favorites"), button -> inviteFavoritePlayers()));
 
         int inviteButtonWidth = 140;
-        int inviteButtonX = centerX - inviteButtonWidth - 4;
-        int declineButtonX = centerX + 4;
-        this.acceptInviteButton = addRenderableWidget(new Button(inviteButtonX, 90, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.accept_invite"), button -> acceptPendingInvite()));
-        this.declineInviteButton = addRenderableWidget(new Button(declineButtonX, 90, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.decline_invite"), button -> declinePendingInvite()));
-        this.autoAcceptToggleButton = addRenderableWidget(new Button(centerX - 95, 90, 190, BUTTON_HEIGHT, autoAcceptToggleLabel(), button -> {
+        // Position invite accept/decline to the left/right of the centered Create Party button, same vertical level
+        this.acceptInviteButton = addRenderableWidget(new Button(createX - inviteButtonWidth - BUTTON_GAP, 34, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.accept_invite"), button -> acceptPendingInvite()));
+        this.declineInviteButton = addRenderableWidget(new Button(createX + BUTTON_WIDTH + BUTTON_GAP, 34, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.decline_invite"), button -> declinePendingInvite()));
+        this.autoAcceptToggleButton = addRenderableWidget(new Button(20, this.height - BUTTON_HEIGHT - 8, 190, BUTTON_HEIGHT, autoAcceptToggleLabel(), button -> {
             ClientPartySettings.toggleAutoAcceptInvites();
             updateAutoAcceptToggleLabel();
             pushToast(new TranslatableComponent(ClientPartySettings.isAutoAcceptInvitesEnabled() ? "screen.vaultpartyui.toast_auto_accept_on" : "screen.vaultpartyui.toast_auto_accept_off"), 0xE3C38C);
         }));
 
-        int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int targetBoxWidth = panelWidth - PANEL_PADDING * 2;
-        int rightPanelX = 20 + panelWidth + PANEL_PADDING;
         this.targetBox = new EditBox(this.font, rightPanelX + PANEL_PADDING, PANEL_TOP + 18, targetBoxWidth, 20, new TranslatableComponent("screen.vaultpartyui.target"));
         this.targetBox.setMaxLength(64);
         addRenderableWidget(this.targetBox);
@@ -192,7 +198,7 @@ public class PartyScreen extends Screen {
         int creditH = 10;
         if (mouseX >= creditX && mouseX <= creditX + creditW && mouseY >= creditY && mouseY <= creditY + creditH) {
             try {
-                openUrl("https://github.com/massuus/vault-hunters-party-ui");
+                openUrl("https://github.com/massuus/vault-party-ui");
             } catch (Exception ignored) {
             }
             return true;
@@ -391,11 +397,23 @@ public class PartyScreen extends Screen {
 
     private void updateActionVisibility() {
         boolean inParty = isLocalPlayerInParty();
-        int centerX = this.width / 2;
+        int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
+        int leftPanelX = 20;
+        int rightPanelX = leftPanelX + panelWidth + PANEL_PADDING;
 
         if (this.createPartyButton != null) {
             this.createPartyButton.visible = !inParty;
-            this.createPartyButton.x = centerX - (BUTTON_WIDTH / 2);
+            int createX = this.width / 2 - (BUTTON_WIDTH / 2);
+            this.createPartyButton.x = createX;
+            // keep accept/decline positioned relative to create button
+            if (this.acceptInviteButton != null) {
+                this.acceptInviteButton.x = createX - (this.acceptInviteButton.getWidth() + BUTTON_GAP);
+                this.acceptInviteButton.y = this.createPartyButton.y;
+            }
+            if (this.declineInviteButton != null) {
+                this.declineInviteButton.x = createX + BUTTON_WIDTH + BUTTON_GAP;
+                this.declineInviteButton.y = this.createPartyButton.y;
+            }
         }
         if (this.leavePartyButton != null) {
             this.leavePartyButton.visible = inParty;
@@ -404,10 +422,9 @@ public class PartyScreen extends Screen {
             this.disbandPartyButton.visible = inParty;
         }
 
-        // Keep the first action row centered for the currently visible controls.
         if (inParty && this.leavePartyButton != null && this.disbandPartyButton != null) {
             int rowWidth = BUTTON_WIDTH * 2 + BUTTON_GAP;
-            int rowX = centerX - rowWidth / 2;
+            int rowX = leftPanelX + panelWidth / 2 - rowWidth / 2;
             this.leavePartyButton.x = rowX;
             this.disbandPartyButton.x = rowX + BUTTON_WIDTH + BUTTON_GAP;
         }
@@ -418,16 +435,22 @@ public class PartyScreen extends Screen {
         if (this.inviteAllButton != null) {
             this.inviteAllButton.visible = inParty;
         }
+        if (this.inviteFavoritesButton != null) {
+            this.inviteFavoritesButton.visible = inParty;
+            this.inviteFavoritesButton.active = inParty && hasInviteableFavorites();
+        }
         if (this.autoAcceptToggleButton != null) {
             this.autoAcceptToggleButton.visible = true;
             this.autoAcceptToggleButton.active = true;
+            this.autoAcceptToggleButton.x = 20;
+            this.autoAcceptToggleButton.y = this.height - BUTTON_HEIGHT - 8;
         }
-        // Keep the second action row centered as a pair.
-        if (this.inviteNearbyButton != null && this.inviteAllButton != null) {
-            int rowWidth = BUTTON_WIDTH * 2 + BUTTON_GAP;
-            int rowX = centerX - rowWidth / 2;
+        if (this.inviteNearbyButton != null && this.inviteAllButton != null && this.inviteFavoritesButton != null) {
+            int rowWidth = BUTTON_WIDTH * 3 + BUTTON_GAP * 2;
+            int rowX = rightPanelX + panelWidth / 2 - rowWidth / 2;
             this.inviteNearbyButton.x = rowX;
             this.inviteAllButton.x = rowX + BUTTON_WIDTH + BUTTON_GAP;
+            this.inviteFavoritesButton.x = rowX + (BUTTON_WIDTH + BUTTON_GAP) * 2;
         }
 
         updateInviteButtons();
@@ -487,7 +510,8 @@ public class PartyScreen extends Screen {
     private void renderOnlinePanel(PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
         int textX = panelX + 10;
         int listTop = PANEL_TOP + 48;
-        int listHeight = VISIBLE_ONLINE_ROWS * ONLINE_ROW_HEIGHT + 6;
+        int panelBottom = PANEL_TOP + PANEL_HEIGHT;
+        int listHeight = Math.min(VISIBLE_ONLINE_ROWS * ONLINE_ROW_HEIGHT + 6, Math.max(0, panelBottom - listTop - 8));
 
         fill(poseStack, panelX + 8, PANEL_TOP + 20, panelX + panelWidth - 8, PANEL_TOP + 42, 0xAA1A1A1A);
         this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.target").getString(), textX, PANEL_TOP + 24, 0xA0A0A0);
@@ -522,16 +546,30 @@ public class PartyScreen extends Screen {
             
             // draw player name and per-row action (invite/remove)
             this.fill(poseStack, panelX + 10, rowY - 2, panelX + panelWidth - 10, rowY + ONLINE_ROW_HEIGHT - 2, background);
-            drawPlayerHead(poseStack, player.id, panelX + 12, rowY);
-            this.font.draw(poseStack, player.name, panelX + 12 + HEAD_SIZE + 4, rowY, RowPresentation.nameColor(row.state));
+            int starX = panelX + 12;
+            int starColor = row.favorite ? 0xFFD76A : 0xB0B0B0;
+            boolean starHovered = isFavoriteToggleHovered(mouseX, mouseY, starX, rowY);
+            if (starHovered) {
+                starColor = 0xFFFFFF;
+            }
+            this.font.draw(poseStack, row.favorite ? "\u2605" : "\u2606", starX, rowY, starColor);
+
+            drawPlayerHead(poseStack, player.id, starX + STAR_SIZE + 4, rowY);
 
             int actionX = panelX + panelWidth - 110;
+            int nameX = starX + STAR_SIZE + 4 + HEAD_SIZE + 4;
+            int nameWidth = Math.max(0, actionX - nameX - 8);
+            String displayName = this.font.plainSubstrByWidth(player.name, nameWidth);
+            this.font.draw(poseStack, displayName, nameX, rowY, RowPresentation.nameColor(row.state));
+
             Component action = RowPresentation.actionLabel(row, isPartyLeader());
             if (action != null) {
                 this.font.draw(poseStack, action.getString(), actionX, rowY, RowPresentation.actionColor(row.state));
             }
 
-            if (hovered) {
+            if (starHovered) {
+                renderTooltip(poseStack, RowPresentation.favoriteTooltip(row.favorite), mouseX, mouseY);
+            } else if (hovered) {
                 Component hint = RowPresentation.tooltip(row, isPartyLeader());
                 if (hint != null) {
                     renderTooltip(poseStack, hint, mouseX, mouseY);
@@ -547,7 +585,8 @@ public class PartyScreen extends Screen {
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int rightPanelX = leftPanelX + panelWidth + PANEL_PADDING;
         int listTop = PANEL_TOP + 48;
-        int listHeight = VISIBLE_ONLINE_ROWS * ONLINE_ROW_HEIGHT + 6;
+        int panelBottom = PANEL_TOP + PANEL_HEIGHT;
+        int listHeight = Math.min(VISIBLE_ONLINE_ROWS * ONLINE_ROW_HEIGHT + 6, Math.max(0, panelBottom - listTop - 8));
         return mouseX >= rightPanelX + 8 && mouseX <= rightPanelX + panelWidth - 8 && mouseY >= listTop && mouseY <= listTop + listHeight;
     }
 
@@ -572,6 +611,12 @@ public class PartyScreen extends Screen {
         int actionY = listTop + (index - this.onlineScrollOffset) * ONLINE_ROW_HEIGHT + 4;
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int actionX = panelX + panelWidth - 110;
+        int starX = panelX + 12;
+        if (isFavoriteToggleHovered(mouseX, mouseY, starX, actionY)) {
+            ClientFavoritePlayers.toggleFavorite(player.id);
+            pushToast(new TranslatableComponent(row.favorite ? "screen.vaultpartyui.toast_favorite_removed" : "screen.vaultpartyui.toast_favorite_added", player.name), 0xE3C38C);
+            return true;
+        }
         if (mouseX >= actionX && mouseX <= actionX + 104 && mouseY >= actionY && mouseY <= actionY + ONLINE_ROW_HEIGHT - 2) {
             performPrimaryRowAction(row);
             return true;
@@ -583,6 +628,49 @@ public class PartyScreen extends Screen {
 
     private boolean isPartyLeader() {
         return PartyRosterService.isPartyLeader(this.currentParty, getLocalPlayerId());
+    }
+
+    private boolean hasInviteableFavorites() {
+        List<OnlineRow> rows = PartyRosterService.buildRows(
+                this.onlinePlayers,
+                FilterMode.ALL,
+                this.currentParty,
+                getLocalPlayerId(),
+                this.inviteCooldownUntilMs
+        );
+
+        for (OnlineRow row : rows) {
+            if (row.favorite && row.state == RowState.INVITEABLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void inviteFavoritePlayers() {
+        List<OnlineRow> rows = PartyRosterService.buildRows(
+                this.onlinePlayers,
+                FilterMode.ALL,
+                this.currentParty,
+                getLocalPlayerId(),
+                this.inviteCooldownUntilMs
+        );
+
+        int invited = 0;
+        for (OnlineRow row : rows) {
+            if (!row.favorite || row.state != RowState.INVITEABLE) {
+                continue;
+            }
+            sendPartyCommand("party invite " + row.player.name);
+            this.inviteCooldownUntilMs.put(row.player.id, System.currentTimeMillis() + INVITE_COOLDOWN_MS);
+            invited++;
+        }
+
+        if (invited > 0) {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_invited_favorites"), 0xA0E0A0);
+        } else {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_no_favorite_invites"), 0xB0B0B0);
+        }
     }
 
     private boolean isLocalPlayerInParty() {
@@ -678,16 +766,16 @@ public class PartyScreen extends Screen {
 
     private String resolvePlayerName(UUID playerId) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null || playerId == null) return "?";
+        if (minecraft == null || playerId == null) return "offline";
         ClientPacketListener connection = minecraft.getConnection();
-        if (connection == null) return "?";
+        if (connection == null) return "offline";
         for (PlayerInfo info : connection.getOnlinePlayers()) {
             GameProfile profile = info.getProfile();
             if (profile != null && playerId.equals(profile.getId())) {
                 return profile.getName();
             }
         }
-        return "?";
+        return "offline";
     }
 
     private String formatHealth(float hp) {
@@ -717,6 +805,10 @@ public class PartyScreen extends Screen {
         return DefaultPlayerSkin.getDefaultSkin(safeId);
     }
 
+    private boolean isFavoriteToggleHovered(double mouseX, double mouseY, int starX, int rowY) {
+        return mouseX >= starX && mouseX <= starX + STAR_SIZE && mouseY >= rowY - 1 && mouseY <= rowY + STAR_SIZE;
+    }
+
     private int statusColor(PartyMember.Status status) {
         if (status == null) return 0xFFFFFF;
         String s = status.name();
@@ -744,18 +836,9 @@ public class PartyScreen extends Screen {
         } catch (Exception ignored) {
         }
 
-        // Fallbacks
-        try {
-            String os = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT);
-            if (os.contains("win")) {
-                Runtime.getRuntime().exec(new String[]{"rundll32", "url.dll,FileProtocolHandler", url});
-            } else if (os.contains("mac")) {
-                Runtime.getRuntime().exec(new String[]{"open", url});
-            } else {
-                Runtime.getRuntime().exec(new String[]{"xdg-open", url});
-            }
-        } catch (Exception ignored) {
-        }
+        // Do not attempt Runtime.exec fallbacks — these use Runtime.getRuntime() and
+        // are rejected by some moderation systems (e.g. CurseForge). If the AWT
+        // Desktop API is not available, silently fail to avoid using Runtime.
     }
 
 }

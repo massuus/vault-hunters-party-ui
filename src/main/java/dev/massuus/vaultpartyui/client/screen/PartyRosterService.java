@@ -1,5 +1,6 @@
 package dev.massuus.vaultpartyui.client.screen;
 
+import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
 import iskallia.vault.client.data.ClientPartyData;
 import iskallia.vault.world.data.VaultPartyData.Party;
 
@@ -32,7 +33,7 @@ final class PartyRosterService {
             if (filterMode == FilterMode.OTHER_PARTY && state != RowState.OTHER_PARTY) {
                 continue;
             }
-            rows.add(new OnlineRow(player, state));
+            rows.add(new OnlineRow(player, state, ClientFavoritePlayers.isFavorite(player.id))); 
         }
 
         rows.sort((a, b) -> {

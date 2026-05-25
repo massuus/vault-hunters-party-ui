@@ -69,4 +69,8 @@ final class RowPresentation {
                 return null;
         }
     }
+
+    static Component favoriteTooltip(boolean favorite) {
+        return new TranslatableComponent(favorite ? "screen.vaultpartyui.tip_unfavorite" : "screen.vaultpartyui.tip_favorite");
+    }
 }
